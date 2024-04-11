@@ -1,0 +1,50 @@
+services:
+  banner_service_db:
+    container_name: banner_service_db
+    image: postgres:12.8
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - banner_service_db_data:/var/lib/postgresql/data
+    profiles: [production]
+
+  banner_service:
+    container_name: banner_service
+    build:
+      context: server
+    ports:
+      - "8008:8008"
+    restart: always
+    environment:
+      - PORT=8008
+      - DB_URL=postgres://postgres:pass@banner_service_db:5432/postgres
+    depends_on:
+      - banner_service_db
+    profiles: [production]
+
+  banner_service_test_db:
+    container_name: banner_service_test_db
+    image: postgres:12.8
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=pass
+    profiles: [test]
+
+  banner_service_test:
+    container_name: banner_service_test
+    build:
+      context: server
+      dockerfile: test/Dockerfile
+    ports:
+      - "8009:8009"
+    restart: always
+    environment:
+      - PORT=8008
+      - DB_URL=postgres://postgres:pass@banner_service_test_db:5432/postgres
+    depends_on:
+      - banner_service_test_db
+    profiles: [test]
+
+volumes:
+  banner_service_db_data:

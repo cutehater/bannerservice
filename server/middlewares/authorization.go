@@ -1,12 +1,13 @@
 package middlewares
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
 	"net/http"
 
-	"bannerservice/db"
-	"bannerservice/schemas"
+	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
+
+	"server/db"
+	"server/schemas"
 )
 
 func IsAuthorized(needAdmin bool) gin.HandlerFunc {

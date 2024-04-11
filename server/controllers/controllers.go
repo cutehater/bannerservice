@@ -1,16 +1,16 @@
 package controllers
 
 import (
-	"bannerservice/db"
-	"bannerservice/schemas"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/lib/pq"
-	"github.com/patrickmn/go-cache"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
+
+	"server/db"
+	"server/schemas"
 )
 
 func parseQueries(c *gin.Context) (tagId int, featureId int, useLastRevision bool, limit int, offset int, err error) {
@@ -76,7 +76,7 @@ func GetUserBanner(c *gin.Context) {
 
 	cacheEntryKey := fmt.Sprintf("%d,%d", tagId, featureId)
 	var banner schemas.Banner
-	if v, ok := db.BannerCache.Get(cacheEntryKey); !ok || useLastRevision {
+	if v, ok := db.BannerCache.Get(cacheEntryKey); ok && !useLastRevision {
 		banner, ok = v.(schemas.Banner)
 		if !ok {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid banner cache entry"})
@@ -115,7 +115,7 @@ func GetBanners(c *gin.Context) {
 		dbQuery = dbQuery.Where("feature_id = ?", featureId)
 	}
 	if tagId != 0 {
-		dbQuery = dbQuery.Where("tag_ids @> ARRAY[?]::integer[]", pq.Array([]int64{int64(tagId)}))
+		dbQuery = dbQuery.Where("tag_ids @> ARRAY[?]::integer[]", int64(tagId))
 	}
 	if limit != 0 {
 		dbQuery = dbQuery.Limit(limit)
@@ -127,12 +127,7 @@ func GetBanners(c *gin.Context) {
 	if err = dbQuery.Find(&banners).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Errorf("error getting banners from database: %w", err).Error()})
 	} else {
-		resp, err := json.Marshal(banners)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Errorf("error getting marshalling banners: %w", err).Error()})
-		} else {
-			c.JSON(http.StatusOK, resp)
-		}
+		c.JSON(http.StatusOK, banners)
 	}
 }
 
@@ -142,7 +137,7 @@ func PostBanner(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("invalid banner body: %w", err).Error()})
 		return
 	}
-	if banner.FeatureID == 0 || banner.TagIDs == nil {
+	if banner.FeatureID == 0 || len(banner.TagIDs) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "feature_id and tag_ids should be non-empty"})
 	}
 
@@ -154,7 +149,7 @@ func PostBanner(c *gin.Context) {
 	}
 }
 
-func findBannerbyId(c *gin.Context) *schemas.Banner {
+func findBannerById(c *gin.Context) *schemas.Banner {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil || id == 0 {
@@ -172,17 +167,17 @@ func findBannerbyId(c *gin.Context) *schemas.Banner {
 }
 
 func UpdateBanner(c *gin.Context) {
-	banner := findBannerbyId(c)
+	banner := findBannerById(c)
 	if banner == nil {
 		return
 	}
 
-	if err := c.BindJSON(banner); err != nil {
+	if err := c.BindJSON(&banner); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("invalid banner body: %w", err).Error()})
 		return
 	}
 
-	if err := db.DB.Model(&schemas.Banner{}).Save(banner).Error; err != nil {
+	if err := db.DB.Save(banner).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, fmt.Errorf("error saving banner to database: %w", err).Error())
 		return
 	} else {
@@ -191,12 +186,12 @@ func UpdateBanner(c *gin.Context) {
 }
 
 func DeleteBanner(c *gin.Context) {
-	banner := findBannerbyId(c)
+	banner := findBannerById(c)
 	if banner == nil {
 		return
 	}
 
-	if err := db.DB.Model(&schemas.Banner{}).Delete(banner).Error; err != nil {
+	if err := db.DB.Delete(banner).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Errorf("error deleting banner from database: %w", err).Error()})
 		return
 	} else {

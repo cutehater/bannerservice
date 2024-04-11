@@ -1,8 +1,9 @@
 package db
 
 import (
-	"github.com/patrickmn/go-cache"
 	"time"
+
+	"github.com/patrickmn/go-cache"
 )
 
 var BannerCache *cache.Cache

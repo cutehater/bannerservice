@@ -1,15 +1,16 @@
 package schemas
 
 import (
+	"time"
+
 	"github.com/lib/pq"
 	"gorm.io/gorm"
-	"time"
 )
 
 type User struct {
 	gorm.Model
-	Token   string `json:"value"`
-	IsAdmin bool   `json:"role"`
+	Token   string `json:"token"`
+	IsAdmin bool   `json:"is_admin"`
 }
 
 type Banner struct {
